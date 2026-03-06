@@ -1,6 +1,5 @@
 package ph.com.guanzongroup.cas.joborder.util;
 
-import java.awt.Color;
 import java.sql.ResultSet;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;

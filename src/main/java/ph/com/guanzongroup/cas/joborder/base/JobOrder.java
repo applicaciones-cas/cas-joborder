@@ -26,6 +26,8 @@ public class JobOrder {
 
     private final String MASTER_TABLE = "JobOrderBranch_Master";
     private final String DETAIL_TABLE = "JobOrderBranch_Detail";
+
+    private final String OTHER_TABLE = "Service_Bay";
     private String p_sBranchCd;
 
     private String p_sMessage;
@@ -35,6 +37,10 @@ public class JobOrder {
     private CachedRowSet p_oDetail;
     private CachedRowSet p_aJOList;
     private CachedRowSet p_oJOServiceStatus;
+
+    private CachedRowSet p_aJOQueue;
+    private CachedRowSet p_aServiceBay;
+    private CachedRowSet p_aJOFinish;
 
     public JobOrder(GRider foApp, String fsBranchCd, boolean fbWithParent) {
         p_oApp = foApp;
@@ -50,7 +56,7 @@ public class JobOrder {
     public void setWithUI(boolean fbValue) {
         p_bWithUI = fbValue;
     }
-    
+
     public String getMessage() {
         return p_sMessage;
     }
@@ -152,6 +158,73 @@ public class JobOrder {
         return getMaster(getColumnIndex(fsIndex));
     }
 
+    //GETTER SETTER FOR MONITORING DISPLAY
+    public int getJobOrderQueueCount() {
+        return p_aJOQueue.size();
+    }
+
+    public int getServiceBayCount() {
+        return p_aServiceBay.size();
+    }
+
+    public int getJobOrderFinishCount() {
+        return p_aJOFinish.size();
+    }
+
+    public Object getJobOrderQueue(int fnRow, int fnIndex) throws SQLException {
+        if (fnIndex == 0) {
+            return null;
+        }
+        if (getJobOrderQueueCount() == 0 || fnRow > getJobOrderQueueCount()) {
+            return null;
+        }
+
+        p_aJOQueue.absolute(fnRow);
+
+        return p_aJOQueue.getObject(fnIndex);
+
+    }
+
+    public Object getJobOrderQueue(int fnRow, String fsIndex) throws SQLException {
+        return getJobOrderQueue(fnRow, getColumnIndex(p_aJOQueue, fsIndex));
+    }
+
+    public Object getServiceBay(int fnRow, int fnIndex) throws SQLException {
+        if (fnIndex == 0) {
+            return null;
+        }
+        if (getServiceBayCount() == 0 || fnRow > getServiceBayCount()) {
+            return null;
+        }
+
+        p_aServiceBay.absolute(fnRow);
+
+        return p_aServiceBay.getObject(fnIndex);
+
+    }
+
+    public Object getServiceBay(int fnRow, String fsIndex) throws SQLException {
+        return getServiceBay(fnRow, getColumnIndex(p_aServiceBay, fsIndex));
+    }
+
+    public Object getJobOrderFinish(int fnRow, int fnIndex) throws SQLException {
+        if (fnIndex == 0) {
+            return null;
+        }
+        if (getJobOrderFinishCount() == 0 || fnRow > getJobOrderFinishCount()) {
+            return null;
+        }
+
+        p_aJOFinish.absolute(fnRow);
+
+        return p_aJOFinish.getObject(fnIndex);
+
+    }
+
+    public Object getJobOrderFinish(int fnRow, String fsIndex) throws SQLException {
+        return getJobOrderFinish(fnRow, getColumnIndex(p_aJOFinish, fsIndex));
+    }
+
     public boolean initialize() throws SQLException {
         String lsSQL;
         RowSetFactory factory = RowSetProvider.newFactory();
@@ -186,7 +259,6 @@ public class JobOrder {
         return true;
     }
 
-  
     public boolean OpenTransaction(String fsTransNox) throws SQLException {
 
         if (p_oApp == null) {
@@ -199,7 +271,7 @@ public class JobOrder {
         if (!saveServiceBay()) {
             return false;
         }
-        
+
         String lsSQL;
         ResultSet loRS;
         RowSetFactory factory = RowSetProvider.newFactory();
@@ -224,15 +296,6 @@ public class JobOrder {
         p_oDetail.populate(loRS);
         MiscUtil.close(loRS);
 
-        MiscUtil.close(loRS);
-
-        return true;
-    }
-
-    private boolean isEntryOK() {
-//        if (p_oDetail.size() == 0) {
-//            return false;
-//        }
         return true;
     }
 
@@ -258,8 +321,6 @@ public class JobOrder {
         loRS = p_oApp.executeQuery(lsSQL);
         p_aJOList = factory.createCachedRowSet();
         p_aJOList.populate(loRS);
-        MiscUtil.close(loRS);
-
         MiscUtil.close(loRS);
 
         if (p_aJOList.size() == 0) {
@@ -292,8 +353,6 @@ public class JobOrder {
         loRS = p_oApp.executeQuery(lsSQL);
         p_aJOList = factory.createCachedRowSet();
         p_aJOList.populate(loRS);
-        MiscUtil.close(loRS);
-
         MiscUtil.close(loRS);
 
         if (p_aJOList.size() == 0) {
@@ -354,8 +413,6 @@ public class JobOrder {
         loRS = p_oApp.executeQuery(lsSQL);
         p_oJOServiceStatus = factory.createCachedRowSet();
         p_oJOServiceStatus.populate(loRS);
-        MiscUtil.close(loRS);
-
         MiscUtil.close(loRS);
 
         if (p_oJOServiceStatus.size() == 0) {
@@ -828,11 +885,11 @@ public class JobOrder {
 
                 System.err.println(lsSQL);
                 if (p_oApp.executeUpdate(lsSQL) <= 0) {
-                    if (!p_bWithParent) {
-                        p_oApp.rollbackTrans();
-                    }
-                    p_sMessage = p_oApp.getMessage() + ";" + p_oApp.getErrMsg();
-                    return false;
+//                    if (!p_bWithParent) {
+//                        p_oApp.rollbackTrans();
+//                    }
+//                    p_sMessage = p_oApp.getMessage() + ";" + p_oApp.getErrMsg();
+//                    return false;
                 }
             }
             if (!p_bWithParent) {
@@ -845,5 +902,102 @@ public class JobOrder {
             p_sMessage = ex.getMessage();
             return false;
         }
+    }
+
+    //=========================MONITORING CLASS=============================
+    public boolean RetrieveJobOrderListQueue() throws SQLException {
+
+        if (p_oApp == null) {
+            p_sMessage = "Application driver is not set.";
+            return false;
+        }
+
+        p_sMessage = "";
+        //save service bay if already existing
+        if (!saveServiceBay()) {
+            return false;
+        }
+        String lsSQL;
+        ResultSet loRS;
+        RowSetFactory factory = RowSetProvider.newFactory();
+
+        lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
+                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 AND dJobEndxx IS NULL ORDER BY sTransNox");
+        System.out.println(lsSQL);
+        loRS = p_oApp.executeQuery(lsSQL);
+        p_aJOQueue = factory.createCachedRowSet();
+        p_aJOQueue.populate(loRS);
+        MiscUtil.close(loRS);
+
+        if (p_aJOQueue.size() == 0) {
+            p_sMessage = "No transaction to open.";
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean RetrieveJobOrderListFinish() throws SQLException {
+
+        if (p_oApp == null) {
+            p_sMessage = "Application driver is not set.";
+            return false;
+        }
+
+        p_sMessage = "";
+        //save service bay if already existing
+        if (!saveServiceBay()) {
+            return false;
+        }
+        String lsSQL;
+        ResultSet loRS;
+        RowSetFactory factory = RowSetProvider.newFactory();
+
+        lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
+                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 AND dJobEndxx IS NOT NULL  ORDER BY sTransNox");
+        System.out.println(lsSQL);
+        loRS = p_oApp.executeQuery(lsSQL);
+        p_aJOFinish = factory.createCachedRowSet();
+        p_aJOFinish.populate(loRS);
+        MiscUtil.close(loRS);
+
+        if (p_aJOFinish.size() == 0) {
+            p_sMessage = "No transaction to open.";
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean RetrieveServiceBay() throws SQLException {
+
+        if (p_oApp == null) {
+            p_sMessage = "Application driver is not set.";
+            return false;
+        }
+
+        p_sMessage = "";
+        //save service bay if already existing
+        if (!saveServiceBay()) {
+            return false;
+        }
+        String lsSQL;
+        ResultSet loRS;
+        RowSetFactory factory = RowSetProvider.newFactory();
+
+        lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
+                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 AND dJobEndxx IS NOT NULL  ORDER BY sTransNox");
+        System.out.println(lsSQL);
+        loRS = p_oApp.executeQuery(lsSQL);
+        p_aServiceBay = factory.createCachedRowSet();
+        p_aServiceBay.populate(loRS);
+        MiscUtil.close(loRS);
+
+        if (p_aServiceBay.size() == 0) {
+            p_sMessage = "No transaction to open.";
+            return false;
+        }
+
+        return true;
     }
 }
