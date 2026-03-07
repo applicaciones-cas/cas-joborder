@@ -3,6 +3,7 @@ package ph.com.guanzongroup.cas.joborder.base;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sql.rowset.CachedRowSet;
@@ -34,12 +35,13 @@ public class JobOrder {
     private boolean p_bWithUI = true;
 
     private CachedRowSet p_oMaster;
+    private CachedRowSet p_oConfiguration;
     private CachedRowSet p_oDetail;
     private CachedRowSet p_aJOList;
     private CachedRowSet p_oJOServiceStatus;
 
     private CachedRowSet p_aJOQueue;
-    private CachedRowSet p_aServiceBay;
+    private CachedRowSet p_aMarketing;
     private CachedRowSet p_aJOFinish;
 
     public JobOrder(GRider foApp, String fsBranchCd, boolean fbWithParent) {
@@ -158,13 +160,26 @@ public class JobOrder {
         return getMaster(getColumnIndex(fsIndex));
     }
 
+    public Object getConfiguration(int fnIndex) throws SQLException {
+        if (fnIndex == 0) {
+            return null;
+        }
+
+        p_oConfiguration.first();
+        return p_oConfiguration.getObject(fnIndex);
+    }
+
+    public Object getConfiguration(String fsIndex) throws SQLException {
+        return getConfiguration(getColumnIndex(p_oConfiguration, fsIndex));
+    }
+
     //GETTER SETTER FOR MONITORING DISPLAY
     public int getJobOrderQueueCount() {
         return p_aJOQueue.size();
     }
 
-    public int getServiceBayCount() {
-        return p_aServiceBay.size();
+    public int getMarketingCount() {
+        return p_aMarketing.size();
     }
 
     public int getJobOrderFinishCount() {
@@ -189,22 +204,22 @@ public class JobOrder {
         return getJobOrderQueue(fnRow, getColumnIndex(p_aJOQueue, fsIndex));
     }
 
-    public Object getServiceBay(int fnRow, int fnIndex) throws SQLException {
+    public Object getMarketing(int fnRow, int fnIndex) throws SQLException {
         if (fnIndex == 0) {
             return null;
         }
-        if (getServiceBayCount() == 0 || fnRow > getServiceBayCount()) {
+        if (getMarketingCount() == 0 || fnRow > getMarketingCount()) {
             return null;
         }
 
-        p_aServiceBay.absolute(fnRow);
+        p_aMarketing.absolute(fnRow);
 
-        return p_aServiceBay.getObject(fnIndex);
+        return p_aMarketing.getObject(fnIndex);
 
     }
 
-    public Object getServiceBay(int fnRow, String fsIndex) throws SQLException {
-        return getServiceBay(fnRow, getColumnIndex(p_aServiceBay, fsIndex));
+    public Object getMarketing(int fnRow, String fsIndex) throws SQLException {
+        return getMarketing(fnRow, getColumnIndex(p_aMarketing, fsIndex));
     }
 
     public Object getJobOrderFinish(int fnRow, int fnIndex) throws SQLException {
@@ -238,23 +253,30 @@ public class JobOrder {
         ResultSet loRS;
 
         //initialize rowset
-        lsSQL = MiscUtil.addCondition(getSQ_Master(), "1=0");
+        lsSQL = "SELECT "
+                + " sBranchCd"
+                + ", dStartUse"
+                + ", nPITCount"
+                + ", IFNULL(cEnblMktg,0) cEnblMktg"
+                + ", IFNULL(nMkgtDrtn,0) nMkgtDrtn"
+                + ", dClosedxx"
+                + ", cRecdStat"
+                + " FROM TCS_Config "
+                + " WHERE sBranchCd = " + SQLUtil.toSQL(p_oApp.getBranchCode())
+                + " AND dStartUse <= " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString())
+                + " AND cRecdStat =" + SQLUtil.toSQL(RecordStatus.ACTIVE);
+
         System.out.println(lsSQL);
         loRS = p_oApp.executeQuery(lsSQL);
-        p_oMaster = factory.createCachedRowSet();
-        p_oMaster.populate(loRS);
+        p_oConfiguration = factory.createCachedRowSet();
+        p_oConfiguration.populate(loRS);
         MiscUtil.close(loRS);
 
-        lsSQL = getSQ_Detail();
-        System.err.println("Retrieve Query = " + lsSQL);
-        loRS = p_oApp.executeQuery(lsSQL);
-        p_oDetail = factory.createCachedRowSet();
-        p_oDetail.populate(loRS);
-        MiscUtil.close(loRS);
+        if (MiscUtil.RecordCount(p_oConfiguration) <= 0) {
 
-        if (getItemCount() == 0) {
-            p_sMessage = "No incentive record to release.";
+            p_sMessage = "No TCS Configuration Detected";
             return false;
+
         }
         return true;
     }
@@ -316,7 +338,9 @@ public class JobOrder {
         RowSetFactory factory = RowSetProvider.newFactory();
 
         lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
-                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 ORDER BY sTransNox");
+                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0"
+                + " AND (dJobEndxx > " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString())
+                + " OR dJobEndxx IS NULL)  ORDER BY sTransNox");
         System.out.println(lsSQL);
         loRS = p_oApp.executeQuery(lsSQL);
         p_aJOList = factory.createCachedRowSet();
@@ -391,7 +415,7 @@ public class JobOrder {
                 + "     COUNT(*) AS sFinished, "
                 + "     IFNULL(SUM(nEstTimex),0) AS nFnshTime "
                 + "  FROM JobOrderBranch_Master "
-                + "  WHERE  dJobEndxx IS NOT NULL "
+                + "  WHERE  dJobEndxx LIKE " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString())
                 + "  AND cTranStat IN ('4','2','0') "
                 + " AND sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%") + ") fn, "
                 /* SERVICE BAY */
@@ -954,7 +978,8 @@ public class JobOrder {
         RowSetFactory factory = RowSetProvider.newFactory();
 
         lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
-                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 AND dJobEndxx IS NOT NULL  ORDER BY sTransNox");
+                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 "
+                + " AND dJobEndxx LIKE " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString()) + " ORDER BY sTransNox");
         System.out.println(lsSQL);
         loRS = p_oApp.executeQuery(lsSQL);
         p_aJOFinish = factory.createCachedRowSet();
@@ -969,7 +994,7 @@ public class JobOrder {
         return true;
     }
 
-    public boolean RetrieveServiceBay() throws SQLException {
+    public boolean RetrieveMarketing() throws SQLException {
 
         if (p_oApp == null) {
             p_sMessage = "Application driver is not set.";
@@ -978,23 +1003,32 @@ public class JobOrder {
 
         p_sMessage = "";
         //save service bay if already existing
-        if (!saveServiceBay()) {
-            return false;
-        }
+//        if (!saveServiceBay()) {
+//            return false;
+//        }
         String lsSQL;
         ResultSet loRS;
         RowSetFactory factory = RowSetProvider.newFactory();
 
-        lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
-                + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 AND dJobEndxx IS NOT NULL  ORDER BY sTransNox");
+        lsSQL = "SELECT"
+                + " sMktgIDxx"
+                + ", sMktgURLx"
+                + ", dDateFrom"
+                + ", dDateThru"
+                + ", cRecdStat"
+                + " FROM Marketing_Display "
+                + " WHERE cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE)
+                + " AND dDateFrom <= " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString())
+                + " AND dDateThru >= " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString());
+
         System.out.println(lsSQL);
         loRS = p_oApp.executeQuery(lsSQL);
-        p_aServiceBay = factory.createCachedRowSet();
-        p_aServiceBay.populate(loRS);
+        p_aMarketing = factory.createCachedRowSet();
+        p_aMarketing.populate(loRS);
         MiscUtil.close(loRS);
 
-        if (p_aServiceBay.size() == 0) {
-            p_sMessage = "No transaction to open.";
+        if (p_aMarketing.size() == 0) {
+            p_sMessage = "No marketing to open.";
             return false;
         }
 
