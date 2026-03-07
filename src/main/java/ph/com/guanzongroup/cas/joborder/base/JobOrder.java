@@ -431,7 +431,7 @@ public class JobOrder {
                 + "     IFNULL(SUM(nEstTimex),0) AS nQueTimex "
                 + "  FROM JobOrderBranch_Master "
                 + "  WHERE cTranStat NOT IN ('4','3') "
-                + "  AND nEstTimex > 0 "
+                + "  AND nEstTimex > 0 AND dJobEndxx IS NULL "
                 + " AND sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%") + ")  q";
         System.out.println(lsSQL);
         loRS = p_oApp.executeQuery(lsSQL);
@@ -979,7 +979,7 @@ public class JobOrder {
 
         lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%")
                 + " AND cTranStat NOT IN ('4','3') AND nEstTimex > 0 "
-                + " AND dJobEndxx LIKE " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString()) + " ORDER BY sTransNox");
+                + " AND dJobEndxx LIKE " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString() + "%") + " ORDER BY sTransNox");
         System.out.println(lsSQL);
         loRS = p_oApp.executeQuery(lsSQL);
         p_aJOFinish = factory.createCachedRowSet();
