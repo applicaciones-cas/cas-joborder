@@ -18,6 +18,12 @@
             <version>0.2-SNAPSHOT</version>
             <type>jar</type>
         </dependency>
+        <dependency>
+            <groupId>org.guanzon</groupId>
+            <artifactId>appdriver-base</artifactId>
+            <version>0.3-SNAPSHOT</version>
+            <type>jar</type>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -30,6 +36,12 @@
                 </configuration>
             </plugin>
         </plugins>
+          
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>            
+        </resources>
     </build>
     
     <distributionManagement>

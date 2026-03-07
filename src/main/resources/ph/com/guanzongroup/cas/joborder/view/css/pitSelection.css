@@ -1,0 +1,83 @@
+
+.dialog-root {
+    -fx-background-color: linear-gradient(
+        to bottom,
+        #4a4a4a,
+        #2e2e2e
+        );
+    -fx-background-radius: 20;
+    -fx-background-insets: 0;
+    -fx-effect: dropshadow(
+        gaussian,
+        rgba(250, 193, 21, 0.5),
+        15,
+        0.3,
+        0,
+        0
+        );
+    -fx-padding: 20;
+}
+
+/* 2. Prompt Label */
+.dialog-label {
+    -fx-text-fill: #e0e0e0;
+    -fx-font-size: 18px;
+    -fx-font-family: "Bell MT";
+}
+
+/* 3. ComboBox styling */
+.dialog-combobox {
+    -fx-background-color: #3B3B3B;
+    -fx-background-radius: 8;
+    -fx-border-color: #D5D5D5;
+    -fx-border-radius: 8;
+    -fx-border-width: 2;
+    -fx-padding: 4 10 4 10;
+    -fx-text-fill: #ffffff;
+}
+.dialog-combobox:hover,
+.dialog-combobox:focused {
+    -fx-border-color: #90BBE1;
+}
+.dialog-combobox .list-cell,
+.dialog-combobox .combo-box-base .text {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: #3B3B3B;
+
+    -fx-font-size: 18px;
+}
+.dialog-combobox .list-view {
+    -fx-background-color: #3B3B3B;
+}
+.dialog-combobox .list-cell:hover {
+    -fx-background-color: linear-gradient(to bottom right, #66b3ff, #0066cc);
+}
+
+.dialog-button {
+    -fx-background-color: linear-gradient(to bottom right, #4da6ff, #007bff);
+    -fx-background-radius: 8;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(
+        gaussian,
+        rgba(21, 193, 252, 0.4),
+        8,
+        0.2,
+        0,
+        0
+        );
+}
+
+.dialog-button:hover {
+    -fx-background-color: linear-gradient(to bottom right, #4da6ff, #007bff);
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(
+        gaussian,
+        rgba(21, 193, 250, 0.6),
+        10,
+        0.3,
+        0,
+        0
+        );
+}
