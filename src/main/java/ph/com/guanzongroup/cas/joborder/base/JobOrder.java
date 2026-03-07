@@ -281,6 +281,53 @@ public class JobOrder {
         return true;
     }
 
+    public boolean isEOD() throws SQLException {
+        if (p_oConfiguration == null) {
+            return false;
+        }
+
+        p_oConfiguration.first();
+
+        Object loClosedDate = p_oConfiguration.getObject("dClosedxx");
+        if (loClosedDate == null) {
+            return false;
+        }
+
+        // Convert whatever type comes back to a date string "yyyy-MM-dd"
+        String lsClosedStr;
+
+        if (loClosedDate instanceof java.time.LocalDateTime) {
+            lsClosedStr = ((java.time.LocalDateTime) loClosedDate)
+                    .toLocalDate().toString(); // "yyyy-MM-dd"
+
+        } else if (loClosedDate instanceof java.time.LocalDate) {
+            lsClosedStr = loClosedDate.toString(); // "yyyy-MM-dd"
+
+        } else if (loClosedDate instanceof java.sql.Date) {
+            lsClosedStr = loClosedDate.toString(); // "yyyy-MM-dd"
+
+        } else if (loClosedDate instanceof java.util.Date) {
+            lsClosedStr = new java.sql.Date(
+                    ((java.util.Date) loClosedDate).getTime()).toString();
+
+        } else {
+            // Fallback — take first 10 chars of whatever toString gives
+            lsClosedStr = loClosedDate.toString().substring(0, 10);
+        }
+
+        // Get today from server as "yyyy-MM-dd"
+        java.util.Date loServerDate = (java.util.Date) p_oApp.getServerDate();
+        String lsTodayStr = new java.sql.Date(loServerDate.getTime()).toString();
+
+        System.err.println("EOD Check — dClosedxx: " + lsClosedStr + " | today: " + lsTodayStr);
+
+        boolean lbResult = lsClosedStr.equals(lsTodayStr);
+        if (lbResult) {
+            p_sMessage = "End of Day is already declared! Unable to re-open Time Commitment System";
+        }
+        return lbResult;
+    }
+
     public boolean OpenTransaction(String fsTransNox) throws SQLException {
 
         if (p_oApp == null) {
@@ -859,7 +906,7 @@ public class JobOrder {
                     + "WHERE  sTransNox =  " + SQLUtil.toSQL(p_oMaster.getString("sTransNox"));
 
             System.err.println(lsSQL);
-            if (p_oApp.executeUpdate(lsSQL) <= 0) {
+            if (p_oApp.executeQuery(lsSQL, "JobOrderBranch_Master", p_sBranchCd, "") <= 0) {
                 if (!p_bWithParent) {
                     p_oApp.rollbackTrans();
                 }
@@ -904,6 +951,57 @@ public class JobOrder {
                 }
                 lsSQL = "UPDATE Service_Bay "
                         + " SET nRemainxx = " + SQLUtil.toSQL(p_aJOList.getObject("nRemainxx"))
+                        + " WHERE sPITIDxxx=  " + SQLUtil.toSQL(p_aJOList.getString("sPITIDxxx"))
+                        + " AND sReferNox = " + SQLUtil.toSQL(p_aJOList.getString("sTransNox"));
+
+                System.err.println(lsSQL);
+                if (p_oApp.executeUpdate(lsSQL) <= 0) {
+//                    if (!p_bWithParent) {
+//                        p_oApp.rollbackTrans();
+//                    }
+//                    p_sMessage = p_oApp.getMessage() + ";" + p_oApp.getErrMsg();
+//                    return false;
+                }
+            }
+            if (!p_bWithParent) {
+                p_oApp.commitTrans();
+            }
+            return true;
+
+        } catch (Exception ex) {
+            Logger.getLogger(JobOrder.class.getName()).log(Level.SEVERE, null, ex);
+            p_sMessage = ex.getMessage();
+            return false;
+        }
+    }
+
+    public boolean pauseAllServiceBay() {
+        if (p_aJOList == null) {
+            return true;
+        }
+        if (getJobOrderCount() <= 0) {
+            return true;
+        }
+
+        String lsSQL;
+        try {
+            if (!p_bWithParent) {
+                p_oApp.beginTrans();
+            }
+            for (int lnRow = 1; lnRow <= getJobOrderCount(); lnRow++) {
+
+                p_aJOList.absolute(lnRow);
+                if (p_aJOList.getString("sReferNox") == null
+                        || p_aJOList.getString("sReferNox").isEmpty()) {
+                    continue;
+                }
+                if (p_aJOList.getString("cPausedxx").equalsIgnoreCase("1")) {
+                    continue;
+                }
+                lsSQL = "UPDATE Service_Bay "
+                        + " SET nRemainxx = " + SQLUtil.toSQL(p_aJOList.getObject("nRemainxx"))
+                        + ", cPausedxx = 1"
+                        + ", dPausedxx = " + SQLUtil.toSQL(p_oApp.getServerDate())
                         + " WHERE sPITIDxxx=  " + SQLUtil.toSQL(p_aJOList.getString("sPITIDxxx"))
                         + " AND sReferNox = " + SQLUtil.toSQL(p_aJOList.getString("sTransNox"));
 
@@ -1033,5 +1131,58 @@ public class JobOrder {
         }
 
         return true;
+    }
+
+    public boolean DeclareEOD() throws SQLException {
+
+        if (p_oConfiguration == null) {
+            p_sMessage = "No Configuration Detected";
+            return false;
+        }
+        p_oConfiguration.first();
+        if (p_oConfiguration.getString("sBranchCd") == null
+                || p_oConfiguration.getString("sBranchCd").isEmpty()) {
+            p_sMessage = "No Configuration Detected";
+            return false;
+        }
+        if (!pauseAllServiceBay()) {
+            return false;
+        }
+
+        // Prevent declaring EOD twice on same day
+        if (isEOD()) {
+            p_sMessage = "End of Day has already been declared today.";
+            return false;
+        }
+        String lsSQL;
+        try {
+
+            if (!p_bWithParent) {
+                p_oApp.beginTrans();
+            }
+            lsSQL = "UPDATE TCS_Config "
+                    + " SET dClosedxx = " + SQLUtil.toSQL(p_oApp.getServerDate())
+                    + " WHERE sBranchCd=  " + SQLUtil.toSQL(p_oApp.getBranchCode())
+                    + " AND cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE);
+
+            System.err.println(lsSQL);
+            if (p_oApp.executeQuery(lsSQL, "TCS_Config", p_oApp.getBranchCode(), "") <= 0) {
+                if (!p_bWithParent) {
+                    p_oApp.rollbackTrans();
+                }
+                p_sMessage = p_oApp.getMessage() + ";" + p_oApp.getErrMsg();
+                return false;
+            }
+
+            if (!p_bWithParent) {
+                p_oApp.commitTrans();
+            }
+            return true;
+
+        } catch (Exception ex) {
+            Logger.getLogger(JobOrder.class.getName()).log(Level.SEVERE, null, ex);
+            p_sMessage = ex.getMessage();
+            return false;
+        }
     }
 }
