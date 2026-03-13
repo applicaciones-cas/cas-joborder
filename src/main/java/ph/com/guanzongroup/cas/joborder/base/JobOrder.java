@@ -471,7 +471,7 @@ public class JobOrder {
                 + "     SUM(CASE WHEN sReferNox <> '' THEN 1 ELSE 0 END) AS sOnGoingx, "
                 + "     IFNULL(SUM(CASE WHEN sReferNox <> '' THEN nRemainxx ELSE 0 END),0) AS nOnGgTime "
                 + "  FROM Service_Bay "
-                + "  WHERE cRecdStat = '1') sb, "
+                + "  WHERE sPITIDxxx LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%") + " AND cRecdStat = '1') sb, "
                 /* QUEUE */
                 + " (SELECT "
                 + "     COUNT(*) AS sQueCount, "
@@ -530,8 +530,8 @@ public class JobOrder {
                 + ", a.cPostedxx"
                 + ", a.sModified"
                 + ", a.dModified"
-                + ", b.sCompnyNm xMechncNm"
-                + ", c.sCompnyNm xClientNm"
+                + ", c.sCompnyNm xMechncNm"
+                + ", b.sCompnyNm xClientNm"
                 + ", e.sModelNme  "
                 + ", IFNULL(f.sReferNox,'') sReferNox"
                 + ", IFNULL(f.sPITNmbrx,'0') sPITNmbrx"
@@ -648,7 +648,8 @@ public class JobOrder {
                 + ", nRemainxx"
                 + ", cRecdStat"
                 + " FROM Service_Bay WHERE (sReferNox ='' OR sReferNox IS NULL) "
-                + " AND cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE);
+                + " AND cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE)
+                + " AND sPITIDxxx LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%");
         try {
             System.err.println(lsSQL);
             ResultSet loRS = p_oApp.executeQuery(lsSQL);
