@@ -462,7 +462,7 @@ public class JobOrder {
                 + "     COUNT(*) AS sFinished, "
                 + "     IFNULL(SUM(nEstTimex),0) AS nFnshTime "
                 + "  FROM JobOrderBranch_Master "
-                + "  WHERE  dJobEndxx LIKE " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString())
+                + "  WHERE  dJobEndxx LIKE " + SQLUtil.toSQL(SQLUtil.toDate(p_oApp.getServerDate()).toString() + "%")
                 + "  AND cTranStat IN ('4','2','0') "
                 + " AND sTransNox LIKE " + SQLUtil.toSQL(p_oApp.getBranchCode() + "%") + ") fn, "
                 /* SERVICE BAY */
